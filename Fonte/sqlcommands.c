@@ -1202,8 +1202,14 @@ void createTable(rc_insert *t) {
   int i;
   int PKcount = 0;
   for(i = 0; i < t->N; i++){
-    if(t->type[i] == 'S')
+    if(t->type[i] == 'S') {
   		size = atoi(t->values[i]);
+      if(size <= 0) {
+        printf("ERROR: invalid size for column \"%s\": VARCHAR size must be a positive integer\n", t->columnName[i]);
+        freeTable(tab);
+        return;
+      }
+    }
   	else if(t->type[i] == 'I')
   		size = sizeof(int);
   	else if(t->type[i] == 'D')
