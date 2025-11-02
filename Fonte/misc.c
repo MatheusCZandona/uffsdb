@@ -129,6 +129,7 @@ void help() {
 	printf("Digite:");
 	printf("\t\\c NOME\t\t- Para conectar-se no banco NAME\n");
 	printf("\t\\q\t\t- Para sair do programa\n");
+    printf("\t\\exit\t\t- Para sair do programa\n");
     printf("\t\\help\t\t- Para ter mais informações sobre o que está implementado\n");
 	printf("----------------- Comandos válidos quando conectado -----------------\n");
 	printf("Digite:");
