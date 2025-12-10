@@ -42,6 +42,9 @@ Lista *op_select(inf_query *);
    ---------------------------------------------------------------------------------------------*/
 void op_delete(Lista *toDeleteTuples, char *tabelaName);
 
+/* Atualiza dados de uma tabela com base em condições WHERE */
+void updateTable();
+
 int afterTrigger(Lista *resultado, inf_query *query);
 
 Lista *handleTableOperation(inf_query *select, char tipo);

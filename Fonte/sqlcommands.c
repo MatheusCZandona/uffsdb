@@ -869,6 +869,15 @@ int afterTrigger(Lista *resultado, inf_query *query) {
     return 1;
 }
 
+/* ----------------------------------------------------------------------------------------------
+    Objetivo:   Atualiza dados de uma tabela com base em condições WHERE 
+    Parametros: Nenhum (usa estrutura global QUERY).
+    Retorno:    Void.
+   ---------------------------------------------------------------------------------------------*/
+void updateTable() {
+    // precisa implementar essa belezura agora
+}
+
 Lista *handleTableOperation(inf_query *query, char tipo) {
     tp_table *esquema;
     tp_buffer *bufferpoll;

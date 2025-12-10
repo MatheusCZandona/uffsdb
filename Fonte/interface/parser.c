@@ -91,6 +91,20 @@ void adcProjSelect(char *col){
   adcNodo(QUERY.proj, QUERY.proj->ult, (void *)str);
 }
 
+void adcUpdateColumn(char *col) {
+    char *str = uffslloc(sizeof(char) * (strlen(col) + 1));
+    strcpy(str, col);
+    if(!QUERY.proj) QUERY.proj = novaLista(NULL);
+    adcNodo(QUERY.proj, QUERY.proj->ult, (void *)str);
+}
+
+void adcUpdateValue(char *val) {
+    char *str = uffslloc(sizeof(char) * (strlen(val) + 1));
+    strcpy(str, val);
+    if(!QUERY.values) QUERY.values = novaLista(NULL);
+    adcNodo(QUERY.values, QUERY.values->ult, (void *)str);
+}
+
 void setObjName(char **nome) {
     if (GLOBAL_PARSER.mode != 0) {
         GLOBAL_DATA.objName = uffslloc(sizeof(char)*((strlen(*nome)+1)));
@@ -202,7 +216,7 @@ void limparLista(Lista *l){
 }
 
 void resetQuery() {
-    if(getMode() == OP_SELECT || getMode() == OP_DELETE) {
+    if(getMode() == OP_SELECT || getMode() == OP_DELETE || getMode() == OP_UPDATE) {
         if(QUERY.tabela) {
             QUERY.tabela = NULL;
         }
@@ -210,6 +224,10 @@ void resetQuery() {
         QUERY.tok = NULL;
         if(QUERY.proj) limparLista(QUERY.proj);
         QUERY.proj = NULL;
+        if(QUERY.values) {
+            limparLista(QUERY.values);
+            QUERY.values = NULL;
+        }
     }
 }
 
@@ -299,6 +317,9 @@ int interface() {
                                 op_delete(resultado, QUERY.tabela);
                                 resultado = NULL;
                             }
+                            break;
+                        case OP_UPDATE:
+                            updateTable();
                             break;
                         case OP_CREATE_TABLE:
                             createTable(&GLOBAL_DATA);
