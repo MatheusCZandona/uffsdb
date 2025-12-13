@@ -874,8 +874,83 @@ int afterTrigger(Lista *resultado, inf_query *query) {
     Parametros: Nenhum (usa estrutura global QUERY).
     Retorno:    Void.
    ---------------------------------------------------------------------------------------------*/
-void updateTable() {
-    // precisa implementar essa belezura agora
+void op_update(Lista *toUpdateTuples, inf_query *query)
+{
+    tp_table *esquema;
+    struct fs_objects objeto = leObjeto(query->tabela);
+    esquema = leSchema(objeto);
+    tp_buffer *bufferpoll = initbuffer();
+    int countUpdateTuples = 0;
+
+    table *tabela = (table *)uffslloc(sizeof(table));
+    tabela->esquema = esquema;
+
+    int tuplaCount = 0, erro;
+    do
+    {
+        erro = colocaTuplaBuffer(bufferpoll, tuplaCount, esquema, objeto);
+        tuplaCount++;
+    } while (erro == SUCCESS || erro == ERRO_LEITURA_DADOS_ATUALIZADOS);
+    tuplaCount--; // ajusta para o número correto de páginas lidas
+
+    // validar compos antes do update
+
+        for (Nodo *temp = toUpdateTuples->prim; temp; temp = temp->prox)
+    {
+        tupla *t = (tupla *)temp->inf;
+        int offsetVal = 0;
+        for (size_t i = 0; i < t->ncols; i++)
+        {
+            column col = t->column[i];
+            Nodo *valNode = query->values->prim;
+            size_t tamanho = retornaTamanhoValorCampo(col.nomeCampo, tabela);
+
+            for (Nodo *j = query->proj->prim; j; j = j->prox)
+            {
+                if (strcmp((char *)j->inf, col.nomeCampo) == 0)
+                {
+                    char *newValue = (char *)valNode->inf;
+                    // Atualiza o valor na tupla
+                    if (col.tipoCampo == 'I')
+                    {
+                        int v = atoi(newValue);
+                        void *end_data = bufferpoll[t->bufferPage].data + t->offset + 1 + offsetVal + t->ncols;
+                        memcpy(end_data, &v, tamanho);
+                    }
+                    else if (col.tipoCampo == 'D')
+                    {
+                        double v = atof(newValue);
+                        void *end_data = bufferpoll[t->bufferPage].data + t->offset + 1 + offsetVal + t->ncols;
+                        memcpy(end_data, &v, tamanho);
+                    }
+                    else
+                    {
+
+                        void *end_data = bufferpoll[t->bufferPage].data + t->offset + 1 + offsetVal + t->ncols;
+                        memcpy(end_data, newValue, tamanho);
+                    }
+                }
+                valNode = valNode->prox;
+            }
+            bufferpoll[t->bufferPage].db = 1; // marca a página como modificada
+            offsetVal += tamanho;
+        }
+
+        countUpdateTuples++;
+    }
+
+    for (int p = 0; p < PAGES && bufferpoll[p].nrec; p++)
+    {
+        int result = writeBufferToDisk(bufferpoll, &objeto, p, bufferpoll->nrec * tamTupla(esquema, objeto));
+        if (!result)
+        {
+            fprintf(stderr, "ERROR: failed to persist changes to disk\n");
+
+            return;
+        }
+    }
+
+    printf("UPDATED %d %s\n", countUpdateTuples, (countUpdateTuples != 1) ? "rows" : "row");
 }
 
 Lista *handleTableOperation(inf_query *query, char tipo) {

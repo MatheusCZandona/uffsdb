@@ -319,7 +319,8 @@ int interface() {
                             }
                             break;
                         case OP_UPDATE:
-                            updateTable();
+                            resultado = handleTableOperation(&QUERY, 'u');
+                            op_update(resultado, &QUERY);
                             break;
                         case OP_CREATE_TABLE:
                             createTable(&GLOBAL_DATA);
