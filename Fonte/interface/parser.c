@@ -98,9 +98,27 @@ void adcUpdateColumn(char *col) {
     adcNodo(QUERY.proj, QUERY.proj->ult, (void *)str);
 }
 
+char *removeAspas(char *str) {
+    if(!str || strlen(str) < 2) return str;
+    
+    int len = strlen(str);
+    
+    // Verifica se começa e termina com aspas simples
+    if(str[0] == '\'' && str[len-1] == '\'') {
+        // Aloca nova string sem as aspas
+        char *novo = uffslloc(sizeof(char) * (len - 1));
+        strncpy(novo, str + 1, len - 2);
+        novo[len - 2] = '\0';
+        return novo;
+    }
+    
+    return str;
+}
+
 void adcUpdateValue(char *val) {
-    char *str = uffslloc(sizeof(char) * (strlen(val) + 1));
-    strcpy(str, val);
+    char *cleanVal = removeAspas(val);
+    char *str = uffslloc(sizeof(char) * (strlen(cleanVal) + 1));
+    strcpy(str, cleanVal);
     if(!QUERY.values) QUERY.values = novaLista(NULL);
     adcNodo(QUERY.values, QUERY.values->ult, (void *)str);
 }
