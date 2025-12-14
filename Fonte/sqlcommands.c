@@ -922,12 +922,14 @@ int validaTypesUpdate(inf_query *query, tp_table *esquema, struct fs_objects obj
         char expectedType = '\0';
         int expectedSize = 0;
         int found = 0;
+        int chave = 0;
         
         for(int i = 0; i < objeto.qtdCampos && col; i++, col = col->next) {
             if(strcmp(col->nome, columnName) == 0) {
                 expectedType = col->tipo;
                 expectedSize = col->tam;
                 found = 1;
+                chave=col->chave;
                 break;
             }
         }
@@ -938,7 +940,14 @@ int validaTypesUpdate(inf_query *query, tp_table *esquema, struct fs_objects obj
         }
         
         char valueType = identificaTipoValor(newValue);
-        
+        if (chave == PK){
+            printf("ERROR: cannot update primary key column '%s'.\n", columnName);
+            return 0;
+        }
+        if (chave == FK){
+            printf("ERROR: cannot update foreign key column '%s'.\n", columnName);
+            return 0;
+        }
         // Valida compatibilidade usando função existente
         if(!typesCompatible(expectedType, valueType)) {
             printf("ERROR: data type invalid for column '%s' (expected: %c, received: %c).\n", 
