@@ -41,6 +41,18 @@ int printbufferpoll(tp_buffer *buffpoll, tp_table *s,struct fs_objects objeto, i
     return SUCCESS;
 }
 
+tp_buffer* initBuffer(unsigned int id){
+    tp_buffer *buffer = uffslloc(sizeof(tp_buffer));
+
+    if (buffer == NULL) {
+        printf("ERROR: Memory allocation failed.\n\n");
+        return NULL;
+    }
+
+    buffer->id = id;
+    return buffer;
+}
+
 // RETORNA PAGINA DO BUFFER
 tupla *getPage(tp_buffer *buffer, tp_table *campos, struct fs_objects objeto, int page){
 
@@ -93,6 +105,21 @@ tupla *getPage(tp_buffer *buffer, tp_table *campos, struct fs_objects objeto, in
         indiceTupla++;
     }
     return tuplas; //Retorna a 'page' do buffer
+}
+
+tp_buffer *getBuffer(unsigned int id, char* filename){
+    FILE *fd = fopen(filename, "r+");
+    
+    if (!fd) {
+        printf("ERROR: failed to open %s", filename);
+        return NULL;
+    }
+
+    long int pos = (long int)id * sizeof(tp_buffer);
+    fseek(fd, pos, SEEK_SET);
+    tp_buffer* buffer = uffslloc(sizeof(tp_buffer));
+    fread(buffer, sizeof(tp_buffer), 1, fd);
+    return buffer;
 }
 // EXCLUIR TUPLA BUFFER
 column * excluirTuplaBuffer(tp_buffer *buffer, tp_table *campos, struct fs_objects objeto, int page, int nTupla){

@@ -134,3 +134,5 @@ void freeColumn(column *);
 void incrementaQtdIndice(char *nTabela);
 
 void adicionaBT(char *nomeTabela, char *nomeAtrib);
+
+void updateSchema(struct fs_objects* objeto);

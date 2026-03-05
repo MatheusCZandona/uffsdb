@@ -121,13 +121,44 @@ int verificaNomeTabela(char *nomeTabela) {
             return 1;
         }
 
-        fseek(dicionario, 32, 1);
+        fseek(dicionario, 34, 1);
     }
 
     fclose(dicionario);
 
     return 0;
 }
+
+void updateSchema(struct fs_objects* objeto){
+    char directory[LEN_DB_NAME_IO];
+    strcpy(directory, connected.db_directory);
+    strcat(directory, "fs_object.dat");
+    FILE *dicionario = fopen(directory, "r+");
+    if (!dicionario) {
+        printf("ERROR: Unable to open file for writing.\n");
+        return ;
+    }
+
+    int codTbl;
+    while(fgetc (dicionario) != EOF){
+        fseek(dicionario, 19, SEEK_CUR); // 20 + (-1)
+        
+        // fwrite(&t->nome,sizeof(t->nome),1,dicionario);
+        fread(&codTbl, sizeof(codTbl), 1, dicionario);
+        if(codTbl == objeto->cod) {
+            fseek(dicionario, -24, SEEK_CUR);
+            fwrite(&objeto->nome,       sizeof(objeto->nome),1,dicionario);
+            fwrite(&objeto->cod,        sizeof(int),         1,dicionario);
+            fwrite(&objeto->qtdCampos,  sizeof(int),         1,dicionario);
+            fwrite(&objeto->qtdIndice,  sizeof(int),         1,dicionario);
+            fwrite(&objeto->blocoLivre, sizeof(int16_t),     1,dicionario);
+        }
+        fseek(dicionario, 34, SEEK_CUR);
+    }
+
+    fclose(dicionario);
+}
+
 ////
 int quantidadeTabelas(){
 
@@ -146,7 +177,7 @@ int quantidadeTabelas(){
 
         codTbl++; // Conta quantas vezes é lido uma tupla no dicionario.
 
-        fseek(dicionario, 52, 1);
+        fseek(dicionario, 54, 1);
     }
 
     fclose(dicionario);
@@ -244,6 +275,7 @@ struct fs_objects leObjetoById(int idTabela){
     char *tupla = (char *)uffslloc(sizeof(char)*TAMANHO_NOME_TABELA);
     memset(tupla, '\0', TAMANHO_NOME_TABELA);
     int cod, qtdCampos, qtdIndice;
+    int16_t blocoLivre;
 
     char directory[LEN_DB_NAME_IO];
     strcpy(directory, connected.db_directory);
@@ -269,12 +301,14 @@ struct fs_objects leObjetoById(int idTabela){
         fread(tupla,sizeof(char),TAMANHO_NOME_TABELA,dicionario);
         fread(&qtdCampos,sizeof(int),1,dicionario);
       	fread(&qtdIndice,sizeof(int),1,dicionario);
+        fread(&blocoLivre,sizeof(int16_t),1,dicionario);
 
         if(cod == idTabela){ // Verifica se o nome dado pelo usuario existe no dicionario de dados.
             strcpylower(objeto.nArquivo, tupla);
             objeto.cod=cod;
             objeto.qtdCampos = qtdCampos;
       		objeto.qtdIndice = qtdIndice;
+            objeto.blocoLivre = blocoLivre;
 
             fclose(dicionario);
             return objeto;
@@ -328,13 +362,16 @@ struct fs_objects leObjeto(char *nomeTabela) {
             strcpylower(objeto.nArquivo, tupla);
             fread(&cod,sizeof(int),1,dicionario);
             objeto.qtdCampos = cod;
-      			fread(&i,sizeof(int),1,dicionario);
-      			objeto.qtdIndice = i;
+      		fread(&i,sizeof(int),1,dicionario);
+      		objeto.qtdIndice = i;
 
+            int16_t n;
+            fread(&n, 2, 1, dicionario);
+            objeto.blocoLivre =n;
             fclose(dicionario);
             return objeto;
         }
-        fseek(dicionario, 32, 1); // Pula a quantidade de caracteres para a proxima verificacao(4B do codigo, 20B do nome do arquivo e 4B da quantidade de campos).
+        fseek(dicionario, 34, 1); // Pula a quantidade de caracteres para a proxima verificacao(4B do codigo, 20B do nome do arquivo e 4B da quantidade de campos).
     }
     fclose(dicionario);
 
@@ -415,7 +452,7 @@ int procuraObjectArquivo(char *nomeTabela){
     int teste        = 0,
         cont         = 0,
         achou        = 0,
-        tamanhoTotal = 52;
+        tamanhoTotal = 54;
 
     char *table = (char *)uffslloc(sizeof(char) * tamanhoTotal);
     FILE *dicionario, *fp;
@@ -658,6 +695,8 @@ int finalizaTabela(table *t){
     fwrite(&nomeArquivo,sizeof(nomeArquivo),1,dicionario);
     fwrite(&qtdCampos,sizeof(qtdCampos),1,dicionario);
     fwrite(&qtdIndice,sizeof(int),1,dicionario);
+    int16_t blocoLivre = -1;
+    fwrite(&blocoLivre, sizeof(int16_t),1,dicionario); 
 
     fclose(dicionario);
     return SUCCESS;
@@ -737,7 +776,7 @@ void printTable(char *tbl){
 			fseek(dicionario, -1, 1);
 			fread(tupla, sizeof(char), TAMANHO_NOME_TABELA, dicionario);
 			printf(" %-10s | %-15s | %-10s | %-10s \n", "public", tupla, "tuple", connected.db_name);
-			fseek(dicionario, 32, 1);
+			fseek(dicionario, 34, 1);
 			i++;
 		}
 		fclose(dicionario);
@@ -766,13 +805,13 @@ void printTable(char *tbl){
 		char **fkTable		= (char**)uffslloc(objeto1.qtdCampos*sizeof(char**));
 		char **fkColumn 	= (char**)uffslloc(objeto1.qtdCampos*sizeof(char**));
 		char **refColumn 	= (char**)uffslloc(objeto1.qtdCampos*sizeof(char**));
-    char **btIndex		= (char**)uffslloc(objeto1.qtdIndice*sizeof(char*));
+        char **btIndex		= (char**)uffslloc(objeto1.qtdIndice*sizeof(char*));
 
 		memset(pk 		, 0, objeto1.qtdCampos);
 		memset(fkTable 	, 0, objeto1.qtdCampos);
 		memset(fkColumn , 0, objeto1.qtdCampos);
 		memset(refColumn, 0, objeto1.qtdCampos);
-    memset(btIndex, 0, objeto1.qtdIndice);
+        memset(btIndex, 0, objeto1.qtdIndice);
 
 		int i;
 		for(i=0; i<objeto1.qtdCampos; i++) {
@@ -788,9 +827,9 @@ void printTable(char *tbl){
 
 		}
 
-    for(i=0; i<objeto1.qtdIndice; i++) {
-      btIndex[i] = (char*)uffslloc (TAMANHO_NOME_CAMPO*sizeof(char));
-    }
+        for(i=0; i<objeto1.qtdIndice; i++) {
+            btIndex[i] = (char*)uffslloc (TAMANHO_NOME_CAMPO*sizeof(char));
+        }
 
 		for(l=0; l<objeto1.qtdCampos; l++) {
 
@@ -802,9 +841,9 @@ void printTable(char *tbl){
 				strcpylower(fkColumn[ifk]	, tab3[l].attApt);
 				strcpylower(refColumn[ifk++], tab3[l].nome);
 			}
-      else if(tab3[l].chave == BT){
-        strcpylower(btIndex[ibt++], tab3[l].nome);
-      }
+            else if(tab3[l].chave == BT){
+                strcpylower(btIndex[ibt++], tab3[l].nome);
+            }
 
 			printf("  %-17s |", tab3[l].nome);
 
@@ -821,18 +860,15 @@ void printTable(char *tbl){
 
 			printf("\n");
 		}
-    if(ipk || ibt)
-      printf("Indexes:\n");
-		if(ipk){	//printf PK's
-			for(l = 0; l < ipk; l++){
-				printf("\t\"%s_pkey\" PRIMARY KEY (%s)\n", tbl, pk[l]);
-			}
-		}
-    if(ibt){
-      for(l = 0; l < ibt; l++){
-        printf("\t\"%s\" BTREE INDEX\n", btIndex[l]);
-      }
-    }
+        if(ipk || ibt) printf("Indexes:\n");
+        if(ipk){	//printf PK's
+            for(l = 0; l < ipk; l++){
+                printf("\t\"%s_pkey\" PRIMARY KEY (%s)\n", tbl, pk[l]);
+            }
+        }
+        if(ibt){
+            for(l = 0; l < ibt; l++) printf("\t\"%s\" BTREE INDEX\n", btIndex[l]);
+        }
 		if(ifk){	//printf FK's
 			printf("Foreign-key constrains:\n");
 			for(l = 0; l < ifk; l++){
@@ -845,21 +881,21 @@ void printTable(char *tbl){
 }
 
 void incrementaQtdIndice(char *nTabela){
-  FILE *dicionario = NULL;
-  char tupla[TAMANHO_NOME_TABELA];
-  memset(tupla, '\0', TAMANHO_NOME_TABELA);
-  int qt = 0, offset = 0;
+    FILE *dicionario = NULL;
+    char tupla[TAMANHO_NOME_TABELA];
+    memset(tupla, '\0', TAMANHO_NOME_TABELA);
+    int qt = 0, offset = 0;
 
-  char directory[LEN_DB_NAME_IO];
-  strcpy(directory, connected.db_directory);
-  strcat(directory, "fs_object.dat");
+    char directory[LEN_DB_NAME_IO];
+    strcpy(directory, connected.db_directory);
+    strcat(directory, "fs_object.dat");
 
-  if((dicionario = fopen(directory,"r+b")) == NULL){
-    printf("Erro ao abrir dicionário de dados.\n");
-    return;
-  }
+    if((dicionario = fopen(directory,"r+b")) == NULL){
+        printf("Erro ao abrir dicionário de dados.\n");
+        return;
+    }
 
-  while(fgetc (dicionario) != EOF){
+    while(fgetc (dicionario) != EOF){
       fseek(dicionario, -1, 1);
 
       fread(tupla, sizeof(char), TAMANHO_NOME_TABELA , dicionario); //Lê somente o nome da tabela
@@ -875,9 +911,9 @@ void incrementaQtdIndice(char *nTabela){
           fclose(dicionario);
           return;
       }
-      fseek(dicionario, 32, 1); // Pula a quantidade de caracteres para a proxima verificacao(4B do codigo, 20B do nome do arquivo e 4B da quantidade de campos).
-  }
-  printf("Erro ao atualizar dicionário de dados.\n");
+      fseek(dicionario, 34, 1); // Pula a quantidade de caracteres para a proxima verificacao(4B do codigo, 20B do nome do arquivo e 4B da quantidade de campos).
+    }
+    printf("Erro ao atualizar dicionário de dados.\n");
 }
 
 

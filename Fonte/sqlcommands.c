@@ -447,10 +447,27 @@ int finalizaInsert(char *nome, column *c, int tamTupla){
 	}
     long int offset = ftell(dados);
 
-    fputc(0, dados); // flag para tupla não deletada
+    tp_buffer *buffer;
+    if (objeto.blocoLivre == -1){
+        buffer = initBuffer(0);
+        objeto.blocoLivre = 0;
+        // se o insert falhar ele atualiza aqui e é problema para os futuros inserts.
+        updateSchema(&objeto); 
+    } else {
+        buffer = getBuffer(objeto.blocoLivre, directory);
+        if(buffer == NULL) return ERRO_ABRIR_ARQUIVO;
 
-    char* buffer = (char *)uffslloc(tamTupla* sizeof(char));
-    int offsetBuffer = 0;
+        if (buffer->position + tamTupla >= SIZE) {
+            buffer = initBuffer(objeto.blocoLivre + 1);
+            updateSchema(&objeto); 
+        }
+    }
+
+    // fputc(0, dados); // flag para tupla não deletada
+
+    char* bufferTuple = (char *)uffslloc(tamTupla);
+    bufferTuple[0] = 0;
+    int offsetBuffer = 1;
 
     for(auxC = c, t = 0; auxC != NULL; auxC = auxC->next, t++){
         if (t >= dicio.qtdCampos) t = 0;
@@ -484,13 +501,13 @@ int finalizaInsert(char *nome, column *c, int tamTupla){
         }
 
         if(auxC->valorCampo == COLUNA_NULL) {
-            fputc(1, dados);
+            bufferTuple[offsetBuffer++] =1;
             auxC->valorCampo = (char *)uffslloc(2);
     
             auxC->valorCampo[0] = '0';
             auxC->valorCampo[1] = '\0';
         } else {
-            fputc(0, dados);
+            bufferTuple[offsetBuffer++] =0;
         }
 
         if (auxT[t].tipo == 'S'){ // Grava um dado do tipo string.
@@ -510,7 +527,7 @@ int finalizaInsert(char *nome, column *c, int tamTupla){
             strncpy(valorCampo, auxC->valorCampo, auxT[t].tam);
             //strcat(valorCampo, "\0");
              valorCampo[auxT[t].tam -1 ] = 0;
-            memcpy(buffer + offsetBuffer, valorCampo, auxT[t].tam);
+            memcpy(bufferTuple + offsetBuffer, valorCampo, auxT[t].tam);
             offsetBuffer += auxT[t].tam;
         }
         else if (auxT[t].tipo == 'I'){ // Grava um dado do tipo inteiro.
@@ -526,7 +543,7 @@ int finalizaInsert(char *nome, column *c, int tamTupla){
           }
           int valorInteiro = 0;
           sscanf(auxC->valorCampo,"%d",&valorInteiro);
-          memcpy(buffer + offsetBuffer, &valorInteiro,sizeof(valorInteiro));
+          memcpy(bufferTuple + offsetBuffer, &valorInteiro,sizeof(valorInteiro));
           offsetBuffer += sizeof(valorInteiro);
           DEBUG_PRINT("INSERT - Integer value written in file: %d", valorInteiro);
         }
@@ -544,7 +561,7 @@ int finalizaInsert(char *nome, column *c, int tamTupla){
           double valorDouble = strtod(auxC->valorCampo, &endptr);
 
 
-          memcpy(buffer + offsetBuffer, &valorDouble, sizeof(double));
+          memcpy(bufferTuple + offsetBuffer, &valorDouble, sizeof(double));
           offsetBuffer += sizeof(valorDouble);
         }
         else if (auxT[t].tipo == 'C'){ // Grava um dado do tipo char.
@@ -555,16 +572,20 @@ int finalizaInsert(char *nome, column *c, int tamTupla){
                 goto fim;
             }
             char valorChar = auxC->valorCampo[0];
-            memcpy(buffer + offsetBuffer, &valorChar, sizeof(char));
+            memcpy(bufferTuple + offsetBuffer, &valorChar, sizeof(char));
             offsetBuffer += sizeof(valorChar);
 
         }
 
     }
     erro = SUCCESS;
-    fwrite(buffer, tamTupla, 1, dados);
+    buffer->position += tamTupla;
+    buffer->nrec++;
+    memcpy(buffer->data + buffer->position, bufferTuple, tamTupla);
     DEBUG_PRINT("INSERT - Tuple size written in file: %d", tamTupla);
-    
+    fseek(dados, buffer->id * sizeof(buffer), SEEK_SET);
+    fwrite(buffer, sizeof(buffer), 1, dados);
+
     fim: //label para liberar a memória utilizada e fechar o arquivo de dados
         fclose(dados);
     return erro;
@@ -1094,7 +1115,7 @@ int excluirTabela(char *nomeTabela) {
         //coloca o nome de todas as tabelas em tupla
         fread(tupla[k], sizeof(char), TAMANHO_NOME_TABELA , dicionario);
         k++;
-        fseek(dicionario, 32, 1);
+        fseek(dicionario, 34, 1);
     }
     fclose(dicionario);
     for(i = 0; i < objeto.qtdCampos; i++){

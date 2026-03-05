@@ -34,6 +34,16 @@ int printbufferpoll(tp_buffer *buffpoll, tp_table *s,struct fs_objects objeto, i
 */
 int colocaTuplaBuffer(tp_buffer *buffer, int from, tp_table *campos, struct fs_objects objeto);
 
+/*
+    Esta função recebe um arquivo e o id do buffer,
+    retorna o buffer carregado ou erro. toma toma.
+*/
+tp_buffer *getBuffer(unsigned int id, char* filename);
+
+/*
+    Retorna um buffer iniciado top top. 
+*/
+tp_buffer * initBuffer(unsigned int id);
 
 /*
     Esta função recupera uma página do buffer e retorna a mesma em uma estrutura do tipo tupla
