@@ -41,6 +41,11 @@ typedef struct tupla {
     column *column;
 }tupla;
 
+typedef struct {
+    tupla *tuplas;
+    int nrec;
+} PageResult;
+
 typedef struct table{ // Estrutura utilizada para criar uma tabela.
     char nome[TAMANHO_NOME_TABELA]; // Nome da tabela.
     tp_table *esquema;              // Esquema de campos da tabela.

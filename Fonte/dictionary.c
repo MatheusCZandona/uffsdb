@@ -63,7 +63,7 @@ int existeAtributo(char *nomeTabela, column *c){
     tp_table *tabela;
     tp_buffer *bufferpoll;
     column *aux = NULL;
-    tupla *pagina = NULL;
+    PageResult *pagina = NULL;
 
     if(iniciaAtributos(&objeto, &tabela, &bufferpoll, nomeTabela) != SUCCESS)
         return ERRO_DE_PARAMETRO;
@@ -72,10 +72,11 @@ int existeAtributo(char *nomeTabela, column *c){
     for(x = 0; erro == SUCCESS; x++)
         erro = colocaTuplaBuffer(bufferpoll, x, tabela, objeto);
 
-    pagina = getPage(bufferpoll, tabela, objeto, 0);
+    // TODO: PAGINA não é necessária aqui
+    pagina = getPage(tabela, objeto, 0);
 
     if(pagina == NULL){
-        pagina = getPage(bufferpoll, tabela, objeto, 1);
+        pagina = getPage(tabela, objeto, 1);
     }
 
     if(pagina != NULL){
@@ -141,19 +142,21 @@ void updateSchema(struct fs_objects* objeto){
 
     int codTbl;
     while(fgetc (dicionario) != EOF){
-        fseek(dicionario, 19, SEEK_CUR); // 20 + (-1)
+        fseek(dicionario, TAMANHO_NOME_TABELA - 1, SEEK_CUR); // 20 + (-1)
         
         // fwrite(&t->nome,sizeof(t->nome),1,dicionario);
         fread(&codTbl, sizeof(codTbl), 1, dicionario);
         if(codTbl == objeto->cod) {
-            fseek(dicionario, -24, SEEK_CUR);
-            fwrite(&objeto->nome,       sizeof(objeto->nome),1,dicionario);
+            fseek(dicionario, -(TAMANHO_NOME_TABELA + 4), SEEK_CUR);
+            fwrite(objeto->nome,        TAMANHO_NOME_TABELA, 1,dicionario);
             fwrite(&objeto->cod,        sizeof(int),         1,dicionario);
+            fwrite(objeto->nArquivo,    TAMANHO_NOME_ARQUIVO,1,dicionario);
             fwrite(&objeto->qtdCampos,  sizeof(int),         1,dicionario);
             fwrite(&objeto->qtdIndice,  sizeof(int),         1,dicionario);
             fwrite(&objeto->blocoLivre, sizeof(int16_t),     1,dicionario);
+            break;
         }
-        fseek(dicionario, 34, SEEK_CUR);
+        fseek(dicionario, TAMANHO_NOME_ARQUIVO + 10, SEEK_CUR);
     }
 
     fclose(dicionario);
@@ -698,6 +701,11 @@ int finalizaTabela(table *t){
     int16_t blocoLivre = -1;
     fwrite(&blocoLivre, sizeof(int16_t),1,dicionario); 
 
+    char directoryDataFile[LEN_DB_NAME_IO];
+    strcpy(directoryDataFile, connected.db_directory);
+    strcat(directoryDataFile, nomeArquivo); // já tem o ".dat" gravado no nArquivo
+    FILE *fp = fopen(directoryDataFile, "wb");
+    fclose(fp); // just create data file
     fclose(dicionario);
     return SUCCESS;
 }

@@ -38,7 +38,7 @@ int colocaTuplaBuffer(tp_buffer *buffer, int from, tp_table *campos, struct fs_o
     Esta função recebe um arquivo e o id do buffer,
     retorna o buffer carregado ou erro. toma toma.
 */
-tp_buffer *getBuffer(unsigned int id, char* filename);
+tp_buffer *getBlock(unsigned int id, char* filename);
 
 /*
     Retorna um buffer iniciado top top. 
@@ -48,12 +48,11 @@ tp_buffer * initBuffer(unsigned int id);
 /*
     Esta função recupera uma página do buffer e retorna a mesma em uma estrutura do tipo tupla
     A estrutura column possui informações de como manipular os dados
-    *buffer - Estrutura para armazenar tuplas na meméria
     *campos - Estrutura que armazena esquema da tabela para ler os dados do buffer
     *objeto - Estrutura que armazena dados sobre a tabela que está no buffer
     *page - Número da página a ser recuperada (0 a PAGES)
 */
-tupla * getPage(tp_buffer *buffer, tp_table *campos, struct fs_objects objeto, int page);
+PageResult * getPage(tp_table *campos, struct fs_objects objeto, int page);
 /*
     Esta função uma determinada tupla do buffer e retorna a mesma em uma estrutura do tipo column;
     A estrutura column possui informações de como manipular os dados

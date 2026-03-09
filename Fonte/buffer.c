@@ -53,61 +53,7 @@ tp_buffer* initBuffer(unsigned int id){
     return buffer;
 }
 
-// RETORNA PAGINA DO BUFFER
-tupla *getPage(tp_buffer *buffer, tp_table *campos, struct fs_objects objeto, int page){
-
-    if(page >= PAGES) return ERRO_PAGINA_INVALIDA;
-
-    if(buffer[page].nrec == 0) //Essa página não possui registros
-        return ERRO_PARAMETRO;
-
-    tupla *tuplas = (tupla *)uffslloc(sizeof(tupla) * (buffer[page].nrec)); //Aloca a quantidade de tuplas necessária
-
-    if(!tuplas)
-        return ERRO_DE_ALOCACAO;
-
-    int  indiceTupla=0, i=0;
-
-    if (!buffer[page].position)
-        return tuplas;
-
-    char* nullos =(char *)uffslloc(objeto.qtdCampos * sizeof(char));
-
-    while(i < buffer[page].position){
-        
-        if(isDeleted(buffer[page].data + i)) {
-            i+=tamTupla(campos, objeto);
-            continue;
-        }
-        tuplas[indiceTupla].offset = i; 
-        tuplas[indiceTupla].ncols = objeto.qtdCampos;
-        i++; //para o byte de deleted
-        memcpy(nullos, buffer[page].data + i, objeto.qtdCampos);
-        i += objeto.qtdCampos;
-
-
-        tuplas[indiceTupla].column = (column *)uffslloc(sizeof(column) * objeto.qtdCampos);
-        tuplas[indiceTupla].bufferPage = page;
-        for (int ic = 0; ic < objeto.qtdCampos; ic++){
-            column *c = &tuplas[indiceTupla].column[ic];
-
-            c->tipoCampo = campos[ic].tipo;
-            strcpy(c->nomeCampo, campos[ic].nome); //Guarda nome do campo
-            if(nullos[ic]) c->valorCampo = COLUNA_NULL;
-            else {
-                c->valorCampo = (char *)uffslloc(sizeof(char) * campos[ic].tam + 1);
-                memcpy(c->valorCampo, buffer[page].data + i, campos[ic].tam);
-                c->valorCampo[campos[ic].tam] = '\0';
-            }
-            i += campos[ic].tam;
-        }
-    
-        indiceTupla++;
-    }
-    return tuplas; //Retorna a 'page' do buffer
-}
-
-tp_buffer *getBuffer(unsigned int id, char* filename){
+tp_buffer *getBlock(unsigned int id, char* filename){
     FILE *fd = fopen(filename, "r+");
     
     if (!fd) {
@@ -121,6 +67,69 @@ tp_buffer *getBuffer(unsigned int id, char* filename){
     fread(buffer, sizeof(tp_buffer), 1, fd);
     return buffer;
 }
+
+// RETORNA PAGINA DO BUFFER
+PageResult *getPage(tp_table *campos, struct fs_objects objeto, int page){
+
+    if(page >= PAGES || page < 0) return ERRO_PAGINA_INVALIDA;
+
+    
+    char directory[LEN_DB_NAME_IO];
+    strcpy(directory, connected.db_directory);
+    strcat(directory, objeto.nArquivo);
+
+    tp_buffer *buffer = getBlock((unsigned int) page, directory);
+
+    tupla *tuplas = (tupla *)uffslloc(sizeof(tupla) * (buffer->nrec)); //Aloca a quantidade de tuplas necessária
+
+    if(!tuplas)
+        return ERRO_DE_ALOCACAO;
+
+    int  indiceTupla=0, i=0;
+
+    if (!buffer->position)
+        return NULL;
+
+    char* nullos =(char *)uffslloc(objeto.qtdCampos * sizeof(char));
+
+    while(i < buffer->position){
+        
+        if(isDeleted(buffer->data + i)) {
+            i+=tamTupla(campos, objeto);
+            continue;
+        }
+        tuplas[indiceTupla].offset = i; 
+        tuplas[indiceTupla].ncols = objeto.qtdCampos;
+        i++; //para o byte de deleted
+        memcpy(nullos, buffer->data + i, objeto.qtdCampos);
+        i += objeto.qtdCampos;
+
+
+        tuplas[indiceTupla].column = (column *)uffslloc(sizeof(column) * objeto.qtdCampos);
+        tuplas[indiceTupla].bufferPage = page;
+        for (int ic = 0; ic < objeto.qtdCampos; ic++){
+            column *c = &tuplas[indiceTupla].column[ic];
+
+            c->tipoCampo = campos[ic].tipo;
+            strcpy(c->nomeCampo, campos[ic].nome); //Guarda nome do campo
+            if(nullos[ic]) c->valorCampo = COLUNA_NULL;
+            else {
+                c->valorCampo = (char *)uffslloc(sizeof(char) * campos[ic].tam + 1);
+                memcpy(c->valorCampo, buffer->data + i, campos[ic].tam);
+                c->valorCampo[campos[ic].tam] = '\0';
+            }
+            i += campos[ic].tam;
+        }
+    
+        indiceTupla++;
+    }
+    PageResult *pg = (PageResult *)uffslloc(sizeof(PageResult));
+    pg->tuplas = tuplas;
+    pg->nrec = indiceTupla;
+
+    return pg; //Retorna a 'page' do buffer
+}
+
 // EXCLUIR TUPLA BUFFER
 column * excluirTuplaBuffer(tp_buffer *buffer, tp_table *campos, struct fs_objects objeto, int page, int nTupla){
     column *tuplas = (column *)uffslloc(sizeof(column)*objeto.qtdCampos);
