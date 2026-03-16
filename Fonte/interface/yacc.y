@@ -50,9 +50,9 @@ int yywrap() {
         CLEAR       CONTR       WHERE       OPERADOR    RELACIONAL
         LOGICO      ASTERISCO   SINAL       FECHA_P     ABRE_P
         STRING      INDEX       ON          IMPLEMENT   HISTORY 
-        DELETE      DELETE_HISTORY;
+        DELETE      DELETE_HISTORY  UPDATE  SET;
 %%
-start: insert | select | delete | create_table | create_database | drop_table | drop_database
+start: insert | select | delete | update | create_table | create_database | drop_table | drop_database
      | table_attr | list_tables | connection | exit_program | semicolon {GLOBAL_PARSER.consoleFlag = 1; return 0;}
      | help_pls | list_databases | clear | contributors | create_index | history_pls | delete_history_pls
      | qualquer_coisa | implement | /*epsilon*/;
@@ -185,7 +185,7 @@ drop_database: DROP DATABASE {setMode(OP_DROP_DATABASE);} OBJECT {setObjName(yyt
 select: SELECT {setMode(OP_SELECT); resetQuery();} projecao
         FROM table_query where semicolon {return 0;};
 
-table_query: OBJECT {adcTabelaQuery(yylval.strval, getMode() == OP_SELECT ? 'S' : 'D');};
+table_query: OBJECT {adcTabelaQuery(yylval.strval, getMode() == OP_SELECT ? 'S' : (getMode() == OP_UPDATE ? 'U' : 'D'));};
 
 projecao: ASTERISCO {adcProjSelect(yylval.strval);}
         |  OBJECT {adcProjSelect(yylval.strval);} projecao2
@@ -234,6 +234,19 @@ atributo: OBJECT {setColumnBtreeCreate(yytext);}
 /* DELETE */
 delete: DELETE FROM {setMode(OP_DELETE); resetQuery();} table_query where semicolon { return 0; };
 
+/* UPDATE */
+update: UPDATE {setMode(OP_UPDATE); resetQuery();} table_query 
+        SET update_list where semicolon {return 0;};
+
+update_list: update_assignment 
+           | update_assignment ',' update_list;
+
+update_assignment: OBJECT {adcUpdateColumn(yylval.strval);} 
+                   RELACIONAL update_value;
+
+update_value: VALUE {adcUpdateValue(yylval.strval);}
+            | NUMBER {adcUpdateValue(yylval.strval);}
+            | STRING {adcUpdateValue(yylval.strval);};
 
 /* END */
 %%

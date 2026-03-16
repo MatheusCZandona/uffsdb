@@ -91,6 +91,38 @@ void adcProjSelect(char *col){
   adcNodo(QUERY.proj, QUERY.proj->ult, (void *)str);
 }
 
+void adcUpdateColumn(char *col) {
+    char *str = uffslloc(sizeof(char) * (strlen(col) + 1));
+    strcpy(str, col);
+    if(!QUERY.proj) QUERY.proj = novaLista(NULL);
+    adcNodo(QUERY.proj, QUERY.proj->ult, (void *)str);
+}
+
+char *removeAspas(char *str) {
+    if(!str || strlen(str) < 2) return str;
+    
+    int len = strlen(str);
+    
+    // Verifica se começa e termina com aspas simples
+    if(str[0] == '\'' && str[len-1] == '\'') {
+        // Aloca nova string sem as aspas
+        char *novo = uffslloc(sizeof(char) * (len - 1));
+        strncpy(novo, str + 1, len - 2);
+        novo[len - 2] = '\0';
+        return novo;
+    }
+    
+    return str;
+}
+
+void adcUpdateValue(char *val) {
+    char *cleanVal = removeAspas(val);
+    char *str = uffslloc(sizeof(char) * (strlen(cleanVal) + 1));
+    strcpy(str, cleanVal);
+    if(!QUERY.values) QUERY.values = novaLista(NULL);
+    adcNodo(QUERY.values, QUERY.values->ult, (void *)str);
+}
+
 void setObjName(char **nome) {
     if (GLOBAL_PARSER.mode != 0) {
         GLOBAL_DATA.objName = uffslloc(sizeof(char)*((strlen(*nome)+1)));
@@ -202,7 +234,7 @@ void limparLista(Lista *l){
 }
 
 void resetQuery() {
-    if(getMode() == OP_SELECT || getMode() == OP_DELETE) {
+    if(getMode() == OP_SELECT || getMode() == OP_DELETE || getMode() == OP_UPDATE) {
         if(QUERY.tabela) {
             QUERY.tabela = NULL;
         }
@@ -210,6 +242,10 @@ void resetQuery() {
         QUERY.tok = NULL;
         if(QUERY.proj) limparLista(QUERY.proj);
         QUERY.proj = NULL;
+        if(QUERY.values) {
+            limparLista(QUERY.values);
+            QUERY.values = NULL;
+        }
     }
 }
 
@@ -299,6 +335,10 @@ int interface() {
                                 op_delete(resultado, QUERY.tabela);
                                 resultado = NULL;
                             }
+                            break;
+                        case OP_UPDATE:
+                            resultado = handleTableOperation(&QUERY, 'u');
+                            op_update(resultado, &QUERY);
                             break;
                         case OP_CREATE_TABLE:
                             createTable(&GLOBAL_DATA);
