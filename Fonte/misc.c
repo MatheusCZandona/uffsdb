@@ -129,6 +129,7 @@ void help() {
 	printf("Digite:");
 	printf("\t\\c NOME\t\t- Para conectar-se no banco NAME\n");
 	printf("\t\\q\t\t- Para sair do programa\n");
+    printf("\t\\exit\t\t- Para sair do programa\n");
     printf("\t\\help\t\t- Para ter mais informações sobre o que está implementado\n");
 	printf("----------------- Comandos válidos quando conectado -----------------\n");
 	printf("Digite:");
@@ -158,7 +159,8 @@ void help() {
     printf("\nCREATE INDEX ON tabela (atributo);\t\t- Cria um índice B+ para o atributo especificado.\n");
     printf("\t\t\t\t\t\t  Não é possível fazer DROP deste índice.\n");
     printf("\nDELETE FROM NOME;\t\t\t\t- Serve para deletar todas as tuplas da tabela desejada\n");
-
+    printf("\nUPDATE NOME SET coluna = valor[colunaN = valorN] [WHERE condicao];\t- Atualiza valores de uma ou mais colunas na(s) tupla(s) que satisfazem a condicao.\n");
+    printf("\t\t\t\t  Se o WHERE for omitido, todas as tuplas da tabela serão atualizadas.\n");
 }
 ////
 void implement() {
@@ -171,11 +173,11 @@ void implement() {
 	printf("SELECT\n");
 	printf("DROP DATABASE\n");
 	printf("DROP TABLE\n");
+    printf("UPDATE\n");
     printf("Sintaxe dos itens acima podem ser visualizadas através do comando 'help'\n");
 	printf("----------------------------------------------------\n");
 	printf("\nComandos SQL não implementados no UFFSDB\n");
     printf("----------------------------------------------------\n");
-    printf("UPDATE\n");
     printf("ALTER TABLE\n");
     printf("DROP INDEX\n");
     printf("NOT NULL\n");
