@@ -2,8 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-
 #include "memoryContext.h"
+#include <ctype.h>
+
 #ifndef FBTREE // includes only if this flag is not defined (preventing duplication)
    #include "btree.h"
 #endif
@@ -869,6 +870,224 @@ int afterTrigger(Lista *resultado, inf_query *query) {
     return 1;
 }
 
+/* ----------------------------------------------------------------------------------------------
+    Objetivo:   Identifica o tipo do valor baseado no formato da string
+    Parametros: String com o valor
+    Retorno:    CHAR ('I', 'D', 'S', 'C', 'N')
+   ---------------------------------------------------------------------------------------------*/
+char identificaTipoValor(char *valor) {
+    if(!valor || strlen(valor) == 0) return 'N'; // NULL
+    
+    // Verifica se é um único caractere não-numérico
+    if(strlen(valor) == 1 && !isdigit(valor[0]) && valor[0] != '-') return 'C';
+    
+    int temPonto = 0;
+    int ehNumero = 1;
+    int inicio = 0;
+    
+    // Permite sinal negativo no início
+    if(valor[0] == '-') inicio = 1;
+    
+    for(int i = inicio; i < strlen(valor); i++) {
+        if(valor[i] == '.') {
+            temPonto++;
+        } else if(!isdigit(valor[i])) {
+            ehNumero = 0;
+            break;
+        }
+    }
+    
+    // Se não é número ou tem mais de um ponto, é STRING
+    if(!ehNumero || temPonto > 1) return 'S';
+    
+    // Se tem ponto decimal, é DOUBLE, senão é INTEGER
+    return temPonto ? 'D' : 'I';
+}
+
+/* ----------------------------------------------------------------------------------------------
+    Objetivo:   Valida se os tipos dos valores no UPDATE são compatíveis com o esquema
+    Parametros: Query do UPDATE, esquema da tabela, objeto da tabela
+    Retorno:    INT (1 = sucesso, 0 = erro)
+   ---------------------------------------------------------------------------------------------*/
+int validaTypesUpdate(inf_query *query, tp_table *esquema, struct fs_objects objeto) {
+    Nodo *colNode = query->proj->prim;  // colunas a serem atualizadas
+    Nodo *valNode = query->values->prim; // novos valores
+    
+    // Percorre cada coluna do UPDATE SET
+    while(colNode && valNode) {
+        char *columnName = (char *)colNode->inf;
+        char *newValue = (char *)valNode->inf;
+        
+        tp_table *col = esquema;
+        char expectedType = '\0';
+        int expectedSize = 0;
+        int found = 0;
+        int chave = 0;
+        
+        for(int i = 0; i < objeto.qtdCampos && col; i++, col = col->next) {
+            if(strcmp(col->nome, columnName) == 0) {
+                expectedType = col->tipo;
+                expectedSize = col->tam;
+                found = 1;
+                chave=col->chave;
+                break;
+            }
+        }
+        
+        if(!found) {
+            printf("ERROR: column \"%s\" does not exist in table.\n", columnName);
+            return 0;
+        }
+        
+        char valueType = identificaTipoValor(newValue);
+        if (chave == PK){
+            printf("ERROR: cannot update primary key column '%s'.\n", columnName);
+            return 0;
+        }
+        if (chave == FK){
+            printf("ERROR: cannot update foreign key column '%s'.\n", columnName);
+            return 0;
+        }
+        // Valida compatibilidade usando função existente
+        if(!typesCompatible(expectedType, valueType)) {
+            printf("ERROR: data type invalid for column '%s' (expected: %c, received: %c).\n", 
+                   columnName, expectedType, valueType);
+            return 0;
+        }
+        
+        // Validações específicas por tipo
+        if(expectedType == 'I') {
+            int inicio = (newValue[0] == '-') ? 1 : 0;
+            for(int i = inicio; i < strlen(newValue); i++) {
+                if(!isdigit(newValue[i])) {
+                    printf("ERROR: column \"%s\" expects integer value.\n", columnName);
+                    return 0;
+                }
+            }
+        }
+        
+        if(expectedType == 'D') {
+            // Valida formato de double
+            int pontos = 0;
+            int inicio = (newValue[0] == '-') ? 1 : 0;
+            for(int i = inicio; i < strlen(newValue); i++) {
+                if(newValue[i] == '.') pontos++;
+                else if(!isdigit(newValue[i])) {
+                    printf("ERROR: column \"%s\" expects double value.\n", columnName);
+                    return 0;
+                }
+            }
+            if(pontos > 1) {
+                printf("ERROR: invalid double format for column \"%s\".\n", columnName);
+                return 0;
+            }
+        }
+        
+        if(expectedType == 'C' && strlen(newValue) > 1) {
+            printf("ERROR: column \"%s\" expects single char value.\n", columnName);
+            return 0;
+        }
+        
+        if(expectedType == 'S' && strlen(newValue) > expectedSize) {
+            printf("ERROR: value too long for column \"%s\" (max: %d, received: %d).\n", 
+                   columnName, expectedSize, (int)strlen(newValue));
+            return 0;
+        }
+        
+        colNode = colNode->prox;
+        valNode = valNode->prox;
+    }
+    
+    return 1;
+}
+
+/* ----------------------------------------------------------------------------------------------
+    Objetivo:   Atualiza dados de uma tabela com base em condições WHERE 
+    Parametros: Nenhum (usa estrutura global QUERY).
+    Retorno:    Void.
+   ---------------------------------------------------------------------------------------------*/
+void op_update(Lista *toUpdateTuples, inf_query *query)
+{
+    tp_table *esquema;
+    struct fs_objects objeto = leObjeto(query->tabela);
+    esquema = leSchema(objeto);
+    tp_buffer *bufferpoll = initbuffer();
+    int countUpdateTuples = 0;
+
+    table *tabela = (table *)uffslloc(sizeof(table));
+    tabela->esquema = esquema;
+
+    int tuplaCount = 0, erro;
+    do
+    {
+        erro = colocaTuplaBuffer(bufferpoll, tuplaCount, esquema, objeto);
+        tuplaCount++;
+    } while (erro == SUCCESS || erro == ERRO_LEITURA_DADOS_ATUALIZADOS);
+    tuplaCount--; // ajusta para o número correto de páginas lidas
+
+    if(!validaTypesUpdate(query, esquema, objeto)) {
+        printf("UPDATE aborted due to type validation error.\n");
+        return;
+    }
+
+        for (Nodo *temp = toUpdateTuples->prim; temp; temp = temp->prox)
+    {
+        tupla *t = (tupla *)temp->inf;
+        int offsetVal = 0;
+        for (size_t i = 0; i < t->ncols; i++)
+        {
+            column col = t->column[i];
+            Nodo *valNode = query->values->prim;
+            size_t tamanho = retornaTamanhoValorCampo(col.nomeCampo, tabela);
+
+            for (Nodo *j = query->proj->prim; j; j = j->prox)
+            {
+                if (strcmp((char *)j->inf, col.nomeCampo) == 0)
+                {
+                    char *newValue = (char *)valNode->inf;
+                    // Atualiza o valor na tupla
+                    if (col.tipoCampo == 'I')
+                    {
+                        int v = atoi(newValue);
+                        void *end_data = bufferpoll[t->bufferPage].data + t->offset + 1 + offsetVal + t->ncols;
+                        memcpy(end_data, &v, tamanho);
+                    }
+                    else if (col.tipoCampo == 'D')
+                    {
+                        double v = atof(newValue);
+                        void *end_data = bufferpoll[t->bufferPage].data + t->offset + 1 + offsetVal + t->ncols;
+                        memcpy(end_data, &v, tamanho);
+                    }
+                    else
+                    {
+
+                        void *end_data = bufferpoll[t->bufferPage].data + t->offset + 1 + offsetVal + t->ncols;
+                        memcpy(end_data, newValue, tamanho);
+                    }
+                }
+                valNode = valNode->prox;
+            }
+            bufferpoll[t->bufferPage].db = 1; // marca a página como modificada
+            offsetVal += tamanho;
+        }
+
+        countUpdateTuples++;
+    }
+
+    for (int p = 0; p < PAGES && bufferpoll[p].nrec; p++)
+    {
+        int result = writeBufferToDisk(bufferpoll, &objeto, p, bufferpoll->nrec * tamTupla(esquema, objeto));
+        if (!result)
+        {
+            fprintf(stderr, "ERROR: failed to persist changes to disk\n");
+
+            return;
+        }
+    }
+
+    printf("UPDATED %d %s\n", countUpdateTuples, (countUpdateTuples != 1) ? "rows" : "row");
+}
+
 Lista *handleTableOperation(inf_query *query, char tipo) {
     tp_table *esquema;
     tp_buffer *bufferpoll;
@@ -1202,8 +1421,14 @@ void createTable(rc_insert *t) {
   int i;
   int PKcount = 0;
   for(i = 0; i < t->N; i++){
-    if(t->type[i] == 'S')
+    if(t->type[i] == 'S') {
   		size = atoi(t->values[i]);
+      if(size <= 0) {
+        printf("ERROR: invalid size for column \"%s\": VARCHAR size must be a positive integer\n", t->columnName[i]);
+        freeTable(tab);
+        return;
+      }
+    }
   	else if(t->type[i] == 'I')
   		size = sizeof(int);
   	else if(t->type[i] == 'D')

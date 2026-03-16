@@ -13,6 +13,7 @@
 #define OP_SELECT 		      6
 #define OP_CREATE_INDEX     7
 #define OP_DELETE           8
+#define OP_UPDATE           9
 
 #ifndef FCOMMANDHANDLER
    #include "commandHandler.h"
@@ -50,6 +51,16 @@ void adcTokenWhere(char *nome,int id);
 Adciona a lista de colunas da projeção de um select.
 */
 void adcProjSelect(char *col);
+
+/*
+  Adiciona coluna que será atualizada no UPDATE.
+*/
+void adcUpdateColumn(char *col);
+
+/*
+  Adiciona valor que será atribuído no UPDATE.
+*/
+void adcUpdateValue(char *val);
 
 /* Função padrão do yacc chamada quando um erro sintático é
  * identificado.
