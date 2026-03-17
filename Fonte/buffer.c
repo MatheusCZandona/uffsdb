@@ -54,6 +54,7 @@ tp_buffer* initBuffer(unsigned int id){
 }
 
 tp_buffer *getBlock(unsigned int id, char* filename){
+    // TODO: change how the file is handled; repeatedly opening and closing it is inefficient (não é top)
     FILE *fd = fopen(filename, "r+");
     
     if (!fd) {
@@ -244,7 +245,7 @@ void cria_campo(int tam, int header, char *val, int x) {
     Parametros: Buffer (tp_buffer), dados da tabela (fs_objects), número de blocos e offset do bloco.
     Retorno:    1 para sucesso, 0 para falha.
    ---------------------------------------------------------------------------------------------*/
-int writeBufferToDisk(tp_buffer *bufferpoll, struct fs_objects *objeto, int blockNumber, int blockOffset) {
+int writeBufferToDisk(tp_buffer *buffer, struct fs_objects *objeto) {
     int success = 1; // flag de sucesso porque sucesso deveria valer 1 não 0!
     char directory[LEN_DB_NAME_IO];
     strcpy(directory, connected.db_directory);
@@ -256,12 +257,10 @@ int writeBufferToDisk(tp_buffer *bufferpoll, struct fs_objects *objeto, int bloc
         return 0;
     }
     
-    fseek(dados, blockNumber*SIZE, SEEK_SET);
-
-    fwrite(bufferpoll->data, blockOffset, 1, dados); //TODO: arrumar o blockOffset
-
-    fflush(dados);
-
+    fseek(dados, buffer->id *sizeof(tp_buffer), SEEK_SET);
+    buffer->db = 0;
+    buffer->pc = 0;
+    fwrite(buffer, sizeof(tp_buffer), 1, dados);
     fclose(dados);
 
     return success;

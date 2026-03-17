@@ -55,6 +55,7 @@ typedef struct tp_buffer{ // Estrutura utilizada para armazenar o buffer.
     unsigned int id;        // posição do bloco no arquivo em relação aos outros blocos [0,1,2,...[
     unsigned int nrec;       //Número de registros armazenados na página.
     uint32_t position;   // Número da quantidade de registro que a página ainda pode receber;
+    // TODO: Separar a struct o que precisar ser persistida e o que fica na memória
     unsigned char db;        //Dirty bit
     unsigned char pc;        //Pin counter
     char data[SIZE];         // Dados

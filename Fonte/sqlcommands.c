@@ -823,38 +823,30 @@ void adcResultado(Lista *resultado, tupla *tuple, int *indiceProj, int qtdColuna
     Retorno:    Void.
    ---------------------------------------------------------------------------------------------*/
 void op_delete(Lista *toDeleteTuples, char *tabelaName) {
-    tp_table *esquema;
     struct fs_objects objeto = leObjeto(tabelaName);
-    esquema = leSchema(objeto);
-    tp_buffer *bufferpoll = initbuffer();
+    tp_buffer *buffer = NULL;
     int countDeletedTuples = 0;
 
-    int tuplaCount = 0, erro;
-    do {
-        erro = colocaTuplaBuffer(bufferpoll, tuplaCount, esquema, objeto);
-        tuplaCount++;
-    } while(erro == SUCCESS || erro == ERRO_LEITURA_DADOS_DELETADOS);
-    tuplaCount--; // ajusta para o número correto de páginas lidas
-
+    char directory[LEN_DB_NAME_IO];
+    strcpy(directory, connected.db_directory);
+    strcat(directory, objeto.nArquivo);
+        
     for (Nodo *temp = toDeleteTuples->prim; temp; temp = temp->prox) {
         tupla *t = (tupla *)temp->inf;
-        *(bufferpoll[t->bufferPage].data+t->offset) = 1; //marca a tupla como deletada
-        bufferpoll[t->bufferPage].db = 1; //marca a página como modificada
+        if(!buffer ) buffer = getBlock(t->bufferPage, directory);
+        else if (buffer->id != t->bufferPage) {
+        // como as tuplas estão ordenadas fisicamente, isto reduz o IO. Quando o bufferpool tiver implementado, nem precisa
+            writeBufferToDisk(buffer, &objeto);
+            buffer = getBlock(t->bufferPage, directory);
+        }
+        buffer->data[t->offset] = 1; //marca a tupla como deletada
+        buffer->db = 1; //marca a página como modificada
         countDeletedTuples++;
     }
 
-    for (int p = 0; p < PAGES && bufferpoll[p].nrec; p++) {
-        int result = writeBufferToDisk(bufferpoll, &objeto, p, bufferpoll->nrec*tamTupla(esquema, objeto));
-        if (!result) {
-            fprintf(stderr, "ERROR: failed to persist changes to disk\n");
-
-            return;
-        }
-    }
-
+    // write the last buffer 
+    writeBufferToDisk(buffer, &objeto);
     printf("DELETED %d %s\n", countDeletedTuples, (countDeletedTuples != 1) ? "rows" : "row");
-
-
 }
 
 int afterTrigger(Lista *resultado, inf_query *query) {
@@ -1017,86 +1009,72 @@ void op_update(Lista *toUpdateTuples, inf_query *query)
     tp_table *esquema;
     struct fs_objects objeto = leObjeto(query->tabela);
     esquema = leSchema(objeto);
-    tp_buffer *bufferpoll = initbuffer();
+    tp_buffer *buffer;
     int countUpdateTuples = 0;
 
     table *tabela = (table *)uffslloc(sizeof(table));
     tabela->esquema = esquema;
 
-    int tuplaCount = 0, erro;
-    do
-    {
-        erro = colocaTuplaBuffer(bufferpoll, tuplaCount, esquema, objeto);
-        tuplaCount++;
-    } while (erro == SUCCESS || erro == ERRO_LEITURA_DADOS_ATUALIZADOS);
-    tuplaCount--; // ajusta para o número correto de páginas lidas
 
     if(!validaTypesUpdate(query, esquema, objeto)) {
         printf("UPDATE aborted due to type validation error.\n");
         return;
     }
 
-        for (Nodo *temp = toUpdateTuples->prim; temp; temp = temp->prox)
-    {
+    char directory[LEN_DB_NAME_IO];
+    strcpy(directory, connected.db_directory);
+    strcat(directory, objeto.nArquivo);
+
+    for (Nodo *temp = toUpdateTuples->prim; temp; temp = temp->prox){
         tupla *t = (tupla *)temp->inf;
+        if(!buffer) buffer = getBlock(t->bufferPage, directory);
+        else if (buffer->id != t->bufferPage) {
+            writeBufferToDisk(buffer, &objeto);
+            buffer = getBlock(t->bufferPage, directory);
+        }
+
         int offsetVal = 0;
-        for (size_t i = 0; i < t->ncols; i++)
-        {
+        for (size_t i = 0; i < t->ncols; i++){
             column col = t->column[i];
             Nodo *valNode = query->values->prim;
             size_t tamanho = retornaTamanhoValorCampo(col.nomeCampo, tabela);
 
-            for (Nodo *j = query->proj->prim; j; j = j->prox)
-            {
-                if (strcmp((char *)j->inf, col.nomeCampo) == 0)
-                {
+            for (Nodo *j = query->proj->prim; j; j = j->prox) {
+                // TODO: optimize the offset calculation
+                if (strcmp((char *)j->inf, col.nomeCampo) == 0){
                     char *newValue = (char *)valNode->inf;
                     // Atualiza o valor na tupla
-                    if (col.tipoCampo == 'I')
-                    {
+                    if (col.tipoCampo == 'I')  {
                         int v = atoi(newValue);
-                        void *end_data = bufferpoll[t->bufferPage].data + t->offset + 1 + offsetVal + t->ncols;
+                        void *end_data = buffer->data + t->offset + 1 + offsetVal + t->ncols;
                         memcpy(end_data, &v, tamanho);
-                    }
-                    else if (col.tipoCampo == 'D')
-                    {
+                    } else if (col.tipoCampo == 'D') {
                         double v = atof(newValue);
-                        void *end_data = bufferpoll[t->bufferPage].data + t->offset + 1 + offsetVal + t->ncols;
+                        void *end_data = buffer->data + t->offset + 1 + offsetVal + t->ncols;
                         memcpy(end_data, &v, tamanho);
-                    }
-                    else
-                    {
+                    } else {
 
-                        void *end_data = bufferpoll[t->bufferPage].data + t->offset + 1 + offsetVal + t->ncols;
+                        void *end_data = buffer->data + t->offset + 1 + offsetVal + t->ncols;
                         memcpy(end_data, newValue, tamanho);
                     }
                 }
                 valNode = valNode->prox;
             }
-            bufferpoll[t->bufferPage].db = 1; // marca a página como modificada
+            buffer[t->bufferPage].db = 1; // marca a página como modificada
             offsetVal += tamanho;
         }
 
         countUpdateTuples++;
     }
 
-    for (int p = 0; p < PAGES && bufferpoll[p].nrec; p++)
-    {
-        int result = writeBufferToDisk(bufferpoll, &objeto, p, bufferpoll->nrec * tamTupla(esquema, objeto));
-        if (!result)
-        {
-            fprintf(stderr, "ERROR: failed to persist changes to disk\n");
-
-            return;
-        }
-    }
+    writeBufferToDisk(buffer, &objeto);
 
     printf("UPDATED %d %s\n", countUpdateTuples, (countUpdateTuples != 1) ? "rows" : "row");
 }
 
 Lista *handleTableOperation(inf_query *query, char tipo) {
     tp_table *esquema;
-    tp_buffer *bufferpoll;
+    // tp_buffer* bufferpoll;
     struct fs_objects objeto;
     if(!verificaNomeTabela(query->tabela)){
         printf("\nERROR: relation \"%s\" was not found.\n\n\n", query->tabela);
@@ -1108,18 +1086,6 @@ Lista *handleTableOperation(inf_query *query, char tipo) {
         printf("ERROR: schema cannot be created.\n");
         return NULL;
     }
-    bufferpoll = initbuffer();
-    if(bufferpoll == ERRO_DE_ALOCACAO){
-        printf("ERROR: no memory available to allocate buffer.\n");
-        return NULL;
-    }
-
-    // int pageCount = 0, erro;
-    // do {
-    //     erro = colocaTuplaBuffer(bufferpoll, pageCount, esquema, objeto);
-    //     pageCount++;
-    // } while(erro == SUCCESS || erro == ERRO_LEITURA_DADOS_DELETADOS);
-    // pageCount--; // ajusta para o número correto de páginas lidas
 
     int *indiceProj = NULL, qtdCamposProj = 0;
     if(tipo == 's') {
@@ -1130,11 +1096,6 @@ Lista *handleTableOperation(inf_query *query, char tipo) {
         qtdCamposProj =  ((char *)query->proj->prim->inf)[0] == '*' ? objeto.qtdCampos : query->proj->tam;
     }
 
-    // tupla *pagina = getPage(bufferpoll, esquema, objeto, 0);
-    // if(!pagina){
-    //     printf("Tabela vazia.\n");
-    //     return NULL;
-    // }
     if(!validaColsWhere(query->tok, esquema, objeto.qtdCampos)){
         return NULL;
     }
