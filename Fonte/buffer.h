@@ -9,12 +9,6 @@
 #endif
 
 /*
-    Esta função tem por objetivo criar e inicializar uma estrutura do tipo tp_buffer
-    que será usada para carregar tuplas na memória
-
-*/
-tp_buffer * initbuffer();
-/*
     Esta função imprime todos os dados carregados numa determinada página do buffer
     *buffer - Estrutura para armazenar tuplas na memória
     *s - Estrutura que armazena esquema da tabela para ler os dados do buffer

@@ -57,20 +57,15 @@ int existeArquivo(const char* filename){
    ---------------------------------------------------------------------------------------------*/
 
 int existeAtributo(char *nomeTabela, column *c){
-    int erro, x, count;
+    int x, count;
     struct fs_objects objeto;
     memset(&objeto, 0, sizeof(struct fs_objects));
     tp_table *tabela;
-    tp_buffer *bufferpoll;
     column *aux = NULL;
     PageResult *pagina = NULL;
 
-    if(iniciaAtributos(&objeto, &tabela, &bufferpoll, nomeTabela) != SUCCESS)
+    if(iniciaAtributos(&objeto, &tabela, nomeTabela) != SUCCESS)
         return ERRO_DE_PARAMETRO;
-
-    erro = SUCCESS;
-    for(x = 0; erro == SUCCESS; x++)
-        erro = colocaTuplaBuffer(bufferpoll, x, tabela, objeto);
 
     // TODO: PAGINA não é necessária aqui
     pagina = getPage(tabela, objeto, 0);

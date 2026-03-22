@@ -100,7 +100,7 @@ int getMaxPrimaryKey(char *nomeTabela) {
     } 
 
     int maiorPK = -1; 
-    for (int page = 0; page < objeto.blocoLivre; page++) {
+    for (int page = 0; page <= objeto.blocoLivre; page++) {
         pagina = getPage(esquema, objeto, page);
         if (!pagina) continue;
 
@@ -172,12 +172,10 @@ char *getInsertedValue(rc_insert *s_insert, char *columnName, table *tabela) {
                 ERRO_DE_PARAMETRO,
    ---------------------------------------------------------------------------------------------*/
 
-int iniciaAtributos(struct fs_objects *objeto, tp_table **tabela, tp_buffer **bufferpool, char *nomeT){
+int iniciaAtributos(struct fs_objects *objeto, tp_table **tabela, char *nomeT){
     *objeto     = leObjeto(nomeT);
     *tabela     = leSchema(*objeto);
-    *bufferpool = initbuffer();
     if(*tabela == ERRO_ABRIR_ESQUEMA) return ERRO_DE_PARAMETRO;
-    if(*bufferpool == ERRO_DE_ALOCACAO) return ERRO_DE_PARAMETRO;
     return SUCCESS;
 }
 ////
@@ -194,26 +192,19 @@ int iniciaAtributos(struct fs_objects *objeto, tp_table **tabela, tp_buffer **bu
    ---------------------------------------------------------------------------------------------*/
 
 int verificaChaveFK(char *nomeTabela,column *c, char *nomeCampo, char *valorCampo, char *tabelaApt, char *attApt){
-    int x, erro, page;
+    int page;
     char str[20];
     char dat[5] = ".dat";
     struct fs_objects objeto;
     tp_table *tabela;
-    tp_buffer *bufferpoll;
     PageResult *pagina = NULL;
 
     strcpylower(str, tabelaApt);
     strcat(str, dat);              //Concatena e junta o nome com .dat
 
-    erro = existeAtributo(nomeTabela, c);
-
-    if(iniciaAtributos(&objeto, &tabela, &bufferpoll, tabelaApt) != SUCCESS) {
+    if(iniciaAtributos(&objeto, &tabela, tabelaApt) != SUCCESS) {
         return ERRO_DE_PARAMETRO;
     }
-
-    erro = SUCCESS;
-    for(x = 0; erro == SUCCESS; x++)
-        erro = colocaTuplaBuffer(bufferpoll, x, tabela, objeto);
 
     for (page = 0; page < PAGES; page++) {
         pagina = getPage(tabela, objeto, page);
@@ -275,14 +266,13 @@ int verificaChavePK(char *nomeTabela, column *c, char *nomeCampo, char *valorCam
 
     struct fs_objects objeto;
     tp_table *tabela;
-    tp_buffer *bufferpoll;
 
     erro = existeAtributo(nomeTabela, c);
     if (erro != SUCCESS ) {
         return ERRO_DE_PARAMETRO;
     }
 
-    if (iniciaAtributos(&objeto, &tabela, &bufferpoll, nomeTabela) != SUCCESS) {
+    if (iniciaAtributos(&objeto, &tabela, nomeTabela) != SUCCESS) {
         return ERRO_DE_PARAMETRO;
     }
 
@@ -836,11 +826,14 @@ void op_delete(Lista *toDeleteTuples, char *tabelaName) {
         if(!buffer ) buffer = getBlock(t->bufferPage, directory);
         else if (buffer->id != t->bufferPage) {
         // como as tuplas estão ordenadas fisicamente, isto reduz o IO. Quando o bufferpool tiver implementado, nem precisa
+            buffer->db = 0;
+            buffer->pc = 0;
             writeBufferToDisk(buffer, &objeto);
             buffer = getBlock(t->bufferPage, directory);
         }
         buffer->data[t->offset] = 1; //marca a tupla como deletada
         buffer->db = 1; //marca a página como modificada
+        buffer->nrec--;
         countDeletedTuples++;
     }
 
@@ -1236,7 +1229,7 @@ int procuraSchemaArquivo(struct fs_objects objeto){
 int excluirTabela(char *nomeTabela) {
     struct fs_objects objeto, objeto1;
     tp_table *esquema, *esquema1;
-    int x,erro, i, j, k, l, qtTable;
+    int i, j, k, l, qtTable;
 	  char str[20];
     char dat[5] = ".dat";
     FILE *f = NULL;
@@ -1317,15 +1310,6 @@ int excluirTabela(char *nomeTabela) {
       }
     }
 
-    tp_buffer *bufferpoll = initbuffer();
-    if(bufferpoll == ERRO_DE_ALOCACAO){
-        printf("ERROR: no memory available to allocate buffer.\n");
-        return ERRO_LEITURA_DADOS;
-    }
-
-    erro = SUCCESS;
-    for(x = 0; erro == SUCCESS; x++)
-        erro = colocaTuplaBuffer(bufferpoll, x, esquema, objeto);
 
     if(procuraSchemaArquivo(objeto) != 0) {
         return ERRO_REMOVER_ARQUIVO_SCHEMA;

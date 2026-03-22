@@ -127,9 +127,9 @@ typedef enum {
 
 typedef struct MemoryContext {
    MemoryContextType type;
-   char memoryPool[MEMORY_CONTEXT_SIZE];
    uint used;
    struct MemoryContext *next;
+    char memoryPool[MEMORY_CONTEXT_SIZE];
 } MemoryContext;
 
 typedef struct MemoryContextRoot {

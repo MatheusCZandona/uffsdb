@@ -16,13 +16,6 @@
 
 static int isDeleted(char *linha);
 
-// INICIALIZACAO DO BUFFER
-tp_buffer * initbuffer() {
-    tp_buffer *bp = (tp_buffer*)uffslloc(PAGES * sizeof(tp_buffer));
-
-    return bp == NULL ? ERRO_DE_ALOCACAO : bp;
-}
-
 //// imprime os dados no buffer (deprecated?)
 int printbufferpoll(tp_buffer *buffpoll, tp_table *s,struct fs_objects objeto, int num_page){
 
