@@ -13,6 +13,10 @@ void* uffsllocType(size_t size, MemoryContextType type) {
     //      pois a struct de metadados tem 8 bytes ,
     //      o que acaba usando muito espaço, duas alocações de 1 byte usam 18.
     size += 1;
+    if(size > MEMORY_CONTEXT_SIZE) {
+        printf("ERROR: Memory %zu bigger than context size %d\n", size, MEMORY_CONTEXT_SIZE);
+        return NULL;
+    }
     MemoryContext *context = type == TEMPORARY ? root.temporary : root.permanent;
     while(context) {
         // confere se na lista tem algum filho com um espacinho que não foi usado antes
@@ -37,10 +41,10 @@ void* uffsllocType(size_t size, MemoryContextType type) {
     newContext->used =  sizeof(uffs_mem_header) + size;
 
     if(type == TEMPORARY) {
-        newContext->next = root.temporary ? root.temporary->next : root.temporary;
+        newContext->next = root.temporary;
         root.temporary = newContext;
     } else {
-        newContext->next = root.permanent ? root.permanent->next : root.permanent;
+        newContext->next = root.permanent;
         root.permanent = newContext;
     }
 

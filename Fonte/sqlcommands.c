@@ -1002,7 +1002,7 @@ void op_update(Lista *toUpdateTuples, inf_query *query)
     tp_table *esquema;
     struct fs_objects objeto = leObjeto(query->tabela);
     esquema = leSchema(objeto);
-    tp_buffer *buffer;
+    tp_buffer *buffer = NULL;
     int countUpdateTuples = 0;
 
     table *tabela = (table *)uffslloc(sizeof(table));
