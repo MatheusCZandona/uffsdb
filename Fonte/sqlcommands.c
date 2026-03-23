@@ -100,7 +100,7 @@ int getMaxPrimaryKey(char *nomeTabela) {
     } 
 
     int maiorPK = -1; 
-    for (int page = 0; page <= objeto.blocoLivre; page++) {
+    for (int page = 0; page <= objeto.lastBuffer; page++) {
         pagina = getPage(esquema, objeto, page);
         if (!pagina) continue;
 
@@ -422,18 +422,18 @@ int finalizaInsert(char *nome, column *c, int tamTupla){
     long int offset = ftell(dados);
 
     tp_buffer *buffer;
-    if (objeto.blocoLivre == -1){
+    if (objeto.lastBuffer == -1){
         buffer = initBuffer(0);
-        objeto.blocoLivre = 0;
+        objeto.lastBuffer = 0;
         // se o insert falhar ele atualiza aqui e é problema para os futuros inserts.
         updateSchema(&objeto); 
     } else {
-        buffer = getBlock(objeto.blocoLivre, directory);
+        buffer = getBlock(objeto.lastBuffer, directory);
         if(buffer == NULL) return ERRO_ABRIR_ARQUIVO;
 
         if (buffer->position + tamTupla >= SIZE) {
-            buffer = initBuffer(objeto.blocoLivre + 1);
-            objeto.blocoLivre++;
+            buffer = initBuffer(objeto.lastBuffer + 1);
+            objeto.lastBuffer++;
             updateSchema(&objeto); 
         }
     }
@@ -1095,7 +1095,7 @@ Lista *handleTableOperation(inf_query *query, char tipo) {
     int k;
     PageResult *pagina;
     Lista *resultado = novaLista(NULL);
-    for(int p = 0; p <= objeto.blocoLivre ; p++) {
+    for(int p = 0; p <= objeto.lastBuffer ; p++) {
         pagina = getPage(esquema, objeto, p);
         if(pagina == ERRO_PARAMETRO){
             printf("ERROR: could not open the table.\n");

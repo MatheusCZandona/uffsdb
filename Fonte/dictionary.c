@@ -148,7 +148,7 @@ void updateSchema(struct fs_objects* objeto){
             fwrite(objeto->nArquivo,    TAMANHO_NOME_ARQUIVO,1,dicionario);
             fwrite(&objeto->qtdCampos,  sizeof(int),         1,dicionario);
             fwrite(&objeto->qtdIndice,  sizeof(int),         1,dicionario);
-            fwrite(&objeto->blocoLivre, sizeof(int16_t),     1,dicionario);
+            fwrite(&objeto->lastBuffer, sizeof(int16_t),     1,dicionario);
             break;
         }
         fseek(dicionario, TAMANHO_NOME_ARQUIVO + 10, SEEK_CUR);
@@ -273,7 +273,7 @@ struct fs_objects leObjetoById(int idTabela){
     char *tupla = (char *)uffslloc(sizeof(char)*TAMANHO_NOME_TABELA);
     memset(tupla, '\0', TAMANHO_NOME_TABELA);
     int cod, qtdCampos, qtdIndice;
-    int16_t blocoLivre;
+    int16_t lastBuffer;
 
     char directory[LEN_DB_NAME_IO];
     strcpy(directory, connected.db_directory);
@@ -299,14 +299,14 @@ struct fs_objects leObjetoById(int idTabela){
         fread(tupla,sizeof(char),TAMANHO_NOME_TABELA,dicionario);
         fread(&qtdCampos,sizeof(int),1,dicionario);
       	fread(&qtdIndice,sizeof(int),1,dicionario);
-        fread(&blocoLivre,sizeof(int16_t),1,dicionario);
+        fread(&lastBuffer,sizeof(int16_t),1,dicionario);
 
         if(cod == idTabela){ // Verifica se o nome dado pelo usuario existe no dicionario de dados.
             strcpylower(objeto.nArquivo, tupla);
             objeto.cod=cod;
             objeto.qtdCampos = qtdCampos;
       		objeto.qtdIndice = qtdIndice;
-            objeto.blocoLivre = blocoLivre;
+            objeto.lastBuffer = lastBuffer;
 
             fclose(dicionario);
             return objeto;
@@ -365,7 +365,7 @@ struct fs_objects leObjeto(char *nomeTabela) {
 
             int16_t n;
             fread(&n, 2, 1, dicionario);
-            objeto.blocoLivre =n;
+            objeto.lastBuffer =n;
             fclose(dicionario);
             return objeto;
         }
@@ -693,8 +693,8 @@ int finalizaTabela(table *t){
     fwrite(&nomeArquivo,sizeof(nomeArquivo),1,dicionario);
     fwrite(&qtdCampos,sizeof(qtdCampos),1,dicionario);
     fwrite(&qtdIndice,sizeof(int),1,dicionario);
-    int16_t blocoLivre = -1;
-    fwrite(&blocoLivre, sizeof(int16_t),1,dicionario); 
+    int16_t lastBuffer = -1;
+    fwrite(&lastBuffer, sizeof(int16_t),1,dicionario); 
 
     char directoryDataFile[LEN_DB_NAME_IO];
     strcpy(directoryDataFile, connected.db_directory);

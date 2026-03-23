@@ -13,7 +13,7 @@ struct fs_objects { // Estrutura usada para carregar fs_objects.dat
     char nArquivo[TAMANHO_NOME_ARQUIVO]; // Nome do arquivo onde estão armazenados os dados da tabela.
     int qtdCampos;                       // Quantidade de campos da tabela.
     int qtdIndice;						 // Quantidade de índices da tabela.
-    int16_t blocoLivre;
+    int16_t lastBuffer;
 };
 
 typedef struct tp_table{ // Estrutura usada para carregar fs_schema.dat
