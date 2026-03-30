@@ -163,7 +163,8 @@ void destroi_arvore(nodo* n) {
 nodo* constroi_bplus(char* nomeTabela){
 	FILE * new = NULL;
 	char le;
-	int le2 = 0, cont = 0, flag = 0;
+	long int le2 = 0;
+	int cont = 0, flag = 0;
 	char* palavra;
 	nodo *aux = NULL;
 	nodo *raiz = NULL;

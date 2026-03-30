@@ -12,7 +12,8 @@ struct fs_objects { // Estrutura usada para carregar fs_objects.dat
     int cod;                             // Código da tabela.
     char nArquivo[TAMANHO_NOME_ARQUIVO]; // Nome do arquivo onde estão armazenados os dados da tabela.
     int qtdCampos;                       // Quantidade de campos da tabela.
-    int qtdIndice;						           // Quantidade de índices da tabela.
+    int qtdIndice;						 // Quantidade de índices da tabela.
+    int16_t lastBuffer;
 };
 
 typedef struct tp_table{ // Estrutura usada para carregar fs_schema.dat
@@ -40,17 +41,24 @@ typedef struct tupla {
     column *column;
 }tupla;
 
+typedef struct {
+    tupla *tuplas;
+    int nrec;
+} PageResult;
+
 typedef struct table{ // Estrutura utilizada para criar uma tabela.
     char nome[TAMANHO_NOME_TABELA]; // Nome da tabela.
     tp_table *esquema;              // Esquema de campos da tabela.
 }table;
 
 typedef struct tp_buffer{ // Estrutura utilizada para armazenar o buffer.
-   unsigned char db;        //Dirty bit
-   unsigned char pc;        //Pin counter
-   unsigned int nrec;       //Número de registros armazenados na página.
-   char data[SIZE];         // Dados
-   unsigned int position;   // Próxima posição válida na página.
+    unsigned int id;        // posição do bloco no arquivo em relação aos outros blocos [0,1,2,...[
+    unsigned int nrec;       //Número de registros armazenados na página.
+    uint32_t position;   // Número da quantidade de registro que a página ainda pode receber;
+    // TODO: Separar a struct o que precisar ser persistida e o que fica na memória
+    unsigned char db;        //Dirty bit
+    unsigned char pc;        //Pin counter
+    char data[SIZE];         // Dados
 }tp_buffer;
 
 typedef struct rc_insert {
@@ -119,9 +127,9 @@ typedef enum {
 
 typedef struct MemoryContext {
    MemoryContextType type;
-   char memoryPool[MEMORY_CONTEXT_SIZE];
    uint used;
    struct MemoryContext *next;
+    char memoryPool[MEMORY_CONTEXT_SIZE];
 } MemoryContext;
 
 typedef struct MemoryContextRoot {

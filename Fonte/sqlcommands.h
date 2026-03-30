@@ -100,7 +100,7 @@ int verificaChavePK(char *, column *, char *, char *);
                 SUCCESS,
                 ERRO_DE_PARAMETRO,
    ---------------------------------------------------------------------------------------------*/
-int iniciaAtributos(struct fs_objects *, tp_table **, tp_buffer **, char *);
+int iniciaAtributos(struct fs_objects *, tp_table **, char *);
 /* ----------------------------------------------------------------------------------------------
     Objetivo:   Recebe o nome de uma tabela e engloba as funções leObjeto() e leSchema().
     Parametros: Nome da Tabela, Objeto da Tabela e tabela.

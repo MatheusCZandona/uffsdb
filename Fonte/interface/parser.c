@@ -404,11 +404,7 @@ int interface() {
             GLOBAL_PARSER.noerror = 1;
         }
 
-        if (GLOBAL_PARSER.mode != 0) {
-            pthread_create(&pth, NULL, (void*)clearGlobalStructs, NULL);
-            pthread_join(pth, NULL);
-        }
-    
+        clearGlobalStructs();
         uffsFree(TEMPORARY);
     }
     return 0;
